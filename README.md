@@ -1,1 +1,1 @@
-## The Link For The Website: https://saintberat.github.io/siteclaritychecker/
+## Siteye ulaşmak için: https://saintberat.github.io/siteclaritychecker/
