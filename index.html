@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BuSiteGüvenliMi?</title>
+<meta name="description" content="URL güvenlik analiz aracı — kaynak kodu, DNS ve yapısal risk taraması.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="scanlines"></div>
+
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spin-ring"></div>
+  <div class="loading-text">Analiz ediliyor...</div>
+  <div class="loading-log" id="loading-log"></div>
+</div>
+
+<div class="wrap">
+  <header class="header">
+    <div class="header-top">
+      <div class="blink-dot"></div>
+      <span class="tag">URL Güvenlik Analizi</span>
+    </div>
+    <h1>BuSite<span class="dim">Güvenli</span>Mi?</h1>
+    <p class="subtitle">Kaynak kodu taraması, yapısal risk analizi ve bilinen tehdit kalıplarıyla URL güvenliğini kontrol eder. Google Safe Browsing API entegrasyonu destekler.</p>
+  </header>
+
+  <div class="form-section">
+    <div class="input-wrap">
+      <span class="input-prefix">$</span>
+      <input type="url" id="url-input" placeholder="https://example.com" autocomplete="off" spellcheck="false" inputmode="url">
+    </div>
+    <div class="controls">
+      <label class="toggle-wrap">
+        <input type="checkbox" id="deep-scan">
+        <span class="toggle-label">Kaynak kodu tara</span>
+      </label>
+      <label class="toggle-wrap">
+        <input type="checkbox" id="strict-mode">
+        <span class="toggle-label">Sıkı mod</span>
+      </label>
+      <button class="btn" id="analyze-btn">
+        <span class="btn-icon">⬡</span> Tara
+      </button>
+    </div>
+    <div class="err-msg" id="err-msg"></div>
+  </div>
+
+  <div class="results" id="results">
+    <div class="divider"></div>
+
+    <div class="verdict-row">
+      <div class="score-block">
+        <div class="score-num" id="score-num">0</div>
+        <div class="score-sub">Risk Puanı / 100</div>
+      </div>
+      <span class="verdict-badge" id="verdict-badge">—</span>
+    </div>
+
+    <div class="meter-bar">
+      <div class="meter-fill" id="meter-fill"></div>
+    </div>
+
+    <div class="summary-text" id="summary-text"></div>
+
+    <div class="section-title">Kontrol Katmanları</div>
+    <div class="checks-grid" id="checks-grid"></div>
+
+    <div class="section-title">Bulgular</div>
+    <ul class="findings" id="findings-list"></ul>
+
+    <div class="source-section" id="source-section" style="display:none">
+      <div class="section-title">Kaynak Kodu Analizi</div>
+      <div class="source-panel">
+        <div class="source-header">
+          <span id="source-url-label" style="color:var(--muted)">—</span>
+          <span class="source-status" id="source-status"></span>
+        </div>
+        <div class="source-body" id="source-body"></div>
+        <div class="source-findings" id="source-findings"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    <div class="footer-item">
+      <div class="footer-item-title">Yapısal analiz</div>
+      <div class="footer-item-desc">HTTPS, IP, Punycode, TLD, subdomain, lookalike ve entropi kontrolü.</div>
+    </div>
+    <div class="footer-item">
+      <div class="footer-item-title">Kaynak tarama</div>
+      <div class="footer-item-desc">Form action'ları, harici script'ler, yönlendirmeler ve inline obfuscation tespiti.</div>
+    </div>
+    <div class="footer-item">
+      <div class="footer-item-title">Sınırlar</div>
+      <div class="footer-item-desc">CORS kısıtlamaları nedeniyle tüm siteler kaynak taramasına izin vermez.</div>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
