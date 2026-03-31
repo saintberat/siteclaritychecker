@@ -2,9 +2,10 @@
 
 const SUSPICIOUS_WORDS = ['login','verify','secure','bank','account','update','signin','confirm','bonus','wallet','suspend','recover','unlock','credential','password','auth'];
 const SUSPICIOUS_TLDS  = ['.zip','.xyz','.top','.site','.online','.tk','.ml','.ga','.cf','.gq','.work','.click','.link','.pw'];
-const BRAND_WORDS      = ['google','microsoft','apple','paypal','amazon','instagram','facebook','netflix','binance','coinbase','telegram','whatsapp','twitter','spotify'];
-const TRUSTED_DOMAINS  = ['google.com','microsoft.com','apple.com','paypal.com','amazon.com','instagram.com','facebook.com','github.com','twitter.com','wikipedia.org','youtube.com'];
-const LOOKALIKE_MAP    = {'0':'o','1':'l','3':'e','4':'a','5':'s','7':'t','@':'a'};
+const BRAND_WORDS      = ['google','microsoft','apple','paypal','amazon','instagram','facebook','netflix','binance','coinbase','telegram','whatsapp','twitter','spotify','trendyol','hepsiburada','ziraat','garanti','akbank','papara','sahibinden','turkiye','turkcell','vodafone','ebanking'];
+const TRUSTED_DOMAINS  = ['google.com','microsoft.com','apple.com','paypal.com','amazon.com','instagram.com','facebook.com','github.com','twitter.com','wikipedia.org','youtube.com','trendyol.com','hepsiburada.com','ziraatbank.com.tr','garantibbva.com.tr','akbank.com','papara.com','sahibinden.com','turkiye.gov.tr','turkcell.com.tr','vodafone.com.tr'];
+const LOOKALIKE_MAP    = {'0':'o','1':'l','3':'e','4':'a','5':'s','7':'t','8':'b','@':'a'};
+const NORM_MAP         = {'rn':'m', 'vv':'w', 'cl':'d', 'ln':'m', '1v':'w', 'lv':'w'};
 
 const PROXIES = [
   url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
@@ -204,16 +205,48 @@ function detectBrand(hostname) {
   const parts = hostname.split('.');
   const main  = parts.length > 1 ? parts[parts.length-2] : parts[0];
   const sub   = parts.length > 2 ? parts.slice(0,-2).join('.') : '';
-  const sim   = lookalike;
+  
+  const normMain = normalizeVisual(main);
+  const normSub  = normalizeVisual(sub);
+
   for (const b of BRAND_WORDS) {
-    if (sub.includes(b) || sim(sub).includes(b)) return b;
-    if (main !== b && (main.includes(b) || sim(main).includes(b))) return b;
+    // 1. Doğrudan içerme (homoglyph/visual sonrası)
+    if (sub.includes(b) || normSub.includes(b)) return b;
+    if (main !== b && (main.includes(b) || normMain.includes(b))) return b;
+
+    // 2. Levenshtein Mesafesi (Typosquatting)
+    // Sadece yeterince uzun markalar için (örn: google vs googel)
+    if (b.length > 3) {
+      if (levenshtein(main, b) <= 1) return b;
+      if (levenshtein(normMain, b) <= 1) return b;
+    }
   }
   return null;
 }
 
-function lookalike(s) {
-  return Array.from(s).map(c => LOOKALIKE_MAP[c] || c).join('');
+function normalizeVisual(s) {
+  let res = s.toLowerCase();
+  // Önce tekli karakter değişimleri
+  res = Array.from(res).map(c => LOOKALIKE_MAP[c] || c).join('');
+  // Sonra çoklu karakter değişimleri (rn -> m vb)
+  for (const [key, val] of Object.entries(NORM_MAP)) {
+    res = res.split(key).join(val);
+  }
+  return res;
+}
+
+function levenshtein(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix = Array.from({ length: b.length + 1 }, (_, i) => [i]);
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      const cost = b[i - 1] === a[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j - 1] + cost);
+    }
+  }
+  return matrix[b.length][a.length];
 }
 
 function isTrusted(h) {
@@ -235,12 +268,23 @@ async function fetchSource(url) {
       const proxyUrl = PROXIES[i](url.href);
       const resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
       if (!resp.ok) continue;
-      const data = await resp.json();
-      const html = data.contents || data.body || '';
+
+      let html = '';
+      const contentType = resp.headers.get('content-type') || '';
+      
+      if (contentType.includes('application/json')) {
+        const data = await resp.json();
+        html = data.contents || data.body || data.response || '';
+      } else {
+        html = await resp.text();
+      }
+
       if (html && html.length > 50) {
         return { ok:true, html, proxy: i+1 };
       }
-    } catch(e) {}
+    } catch(e) {
+      console.warn(`Proxy ${i+1} fail:`, e);
+    }
   }
   return { ok:false, reason:'CORS veya bağlantı hatası' };
 }
