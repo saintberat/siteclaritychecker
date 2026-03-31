@@ -2,10 +2,30 @@
 
 const SUSPICIOUS_WORDS = ['login','verify','secure','bank','account','update','signin','confirm','bonus','wallet','suspend','recover','unlock','credential','password','auth'];
 const SUSPICIOUS_TLDS  = ['.zip','.xyz','.top','.site','.online','.tk','.ml','.ga','.cf','.gq','.work','.click','.link','.pw'];
-const BRAND_WORDS      = ['google','microsoft','apple','paypal','amazon','instagram','facebook','netflix','binance','coinbase','telegram','whatsapp','twitter','spotify','trendyol','hepsiburada','ziraat','garanti','akbank','papara','sahibinden','turkiye','turkcell','vodafone','ebanking'];
-const TRUSTED_DOMAINS  = ['google.com','microsoft.com','apple.com','paypal.com','amazon.com','instagram.com','facebook.com','github.com','twitter.com','wikipedia.org','youtube.com','trendyol.com','hepsiburada.com','ziraatbank.com.tr','garantibbva.com.tr','akbank.com','papara.com','sahibinden.com','turkiye.gov.tr','turkcell.com.tr','vodafone.com.tr'];
-const LOOKALIKE_MAP    = {'0':'o','1':'l','3':'e','4':'a','5':'s','7':'t','8':'b','@':'a'};
-const NORM_MAP         = {'rn':'m', 'vv':'w', 'cl':'d', 'ln':'m', '1v':'w', 'lv':'w'};
+const BRAND_WORDS      = [
+  'google','microsoft','apple','paypal','amazon','instagram','facebook','netflix',
+  'binance','coinbase','telegram','whatsapp','twitter','spotify',
+  'trendyol','hepsiburada','ziraat','garanti','akbank','papara',
+  'sahibinden','turkiye','turkcell','vodafone','ebanking'
+];
+const TRUSTED_DOMAINS  = [
+  'google.com','microsoft.com','apple.com','paypal.com','amazon.com',
+  'instagram.com','facebook.com','github.com','twitter.com','wikipedia.org',
+  'youtube.com','trendyol.com','hepsiburada.com','ziraatbank.com.tr',
+  'garantibbva.com.tr','akbank.com','papara.com','sahibinden.com',
+  'turkiye.gov.tr','turkcell.com.tr','vodafone.com.tr'
+];
+
+const LOOKALIKE_MAP = {
+  '0':'o','1':'l','3':'e','4':'a','5':'s','7':'t','8':'b','@':'a',
+  '6':'g','9':'g','$':'s','!':'i','|':'i'
+};
+
+const NORM_MAP = {
+  'rn':'m', 'vv':'w', 'cl':'d', 'ln':'m', '1v':'w', 'lv':'w',
+  'ii':'n', 'ij':'n', 'li':'h', 'ri':'n', 'nn':'m', 'oo':'o',
+  'vv':'w', 'cj':'g', 'ce':'e'
+};
 
 const PROXIES = [
   url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
@@ -155,11 +175,23 @@ function analyzeUrl(url, isStrict) {
     checks.structure = { label:'Yapı', state:'safe', value:'Normal' };
   }
 
-  const fakeBrand = detectBrand(hostname);
-  if (fakeBrand) {
-    score += 32;
-    checks.brand = { label:'Marka Risk', state:'danger', value: fakeBrand };
-    findings.push({ tone:'danger', text:`"${fakeBrand}" markasına benzemeye çalışan alan adı tespit edildi.` });
+  const brandHit = detectBrand(hostname);
+  if (brandHit) {
+    score += 35;
+    checks.brand = { label:'Marka Risk', state:'danger', value: brandHit.brand.toUpperCase() };
+
+    const methodLabels = {
+      subdomain:   'Subdomain Aldatmacası',
+      homoglyph:   'Görsel Benzerlik (Homoglyph)',
+      typosquatting:'Yazım Hatası (Typosquatting)',
+      contains:    'Marka İsmi İçerme'
+    };
+    const methodLabel = methodLabels[brandHit.type] || brandHit.type;
+
+    findings.push({
+      tone: 'danger',
+      text: `KRİTİK: Bu alan adı doğrudan "${brandHit.brand.toUpperCase()}" markasını taklit ediyor olabilir! (Yöntem: ${methodLabel})`
+    });
   } else {
     checks.brand = { label:'Marka Risk', state:'safe', value:'Temiz' };
     findings.push({ tone:'safe', text:'Bilinen markaları taklit eden bir pattern bulunamadı.' });
@@ -202,33 +234,44 @@ function analyzeUrl(url, isStrict) {
 
 function detectBrand(hostname) {
   if (isTrusted(hostname)) return null;
-  const parts = hostname.split('.');
-  const main  = parts.length > 1 ? parts[parts.length-2] : parts[0];
-  const sub   = parts.length > 2 ? parts.slice(0,-2).join('.') : '';
-  
-  const normMain = normalizeVisual(main);
-  const normSub  = normalizeVisual(sub);
 
-  for (const b of BRAND_WORDS) {
-    // 1. Doğrudan içerme (homoglyph/visual sonrası)
-    if (sub.includes(b) || normSub.includes(b)) return b;
-    if (main !== b && (main.includes(b) || normMain.includes(b))) return b;
+  const parts   = hostname.split('.');
+  const tldSpan = parts[parts.length - 1] === 'tr' ? 2 : 1;
+  const mainPart = parts.length > tldSpan ? parts[parts.length - 1 - tldSpan] : parts[0];
+  const subParts = parts.length > tldSpan + 1 ? parts.slice(0, parts.length - 1 - tldSpan) : [];
+  const subJoined = subParts.join('.');
 
-    // 2. Levenshtein Mesafesi (Typosquatting)
-    // Sadece yeterince uzun markalar için (örn: google vs googel)
-    if (b.length > 3) {
-      if (levenshtein(main, b) <= 1) return b;
-      if (levenshtein(normMain, b) <= 1) return b;
+  const normMain = normalizeVisual(mainPart);
+  const normSub  = normalizeVisual(subJoined);
+
+  for (const brand of BRAND_WORDS) {
+    const normBrand = normalizeVisual(brand);
+
+    if (subJoined && (subJoined.includes(brand) || normSub.includes(normBrand))) {
+      return { brand, type: 'subdomain' };
+    }
+
+    if (normMain === normBrand && mainPart !== brand) {
+      return { brand, type: 'homoglyph' };
+    }
+
+    if (brand.length >= 4) {
+      if (levenshtein(mainPart, brand) === 1 || levenshtein(normMain, normBrand) === 1) {
+        return { brand, type: 'typosquatting' };
+      }
+    }
+
+    if (mainPart !== brand && (mainPart.includes(brand) || normMain.includes(normBrand))) {
+      return { brand, type: 'contains' };
     }
   }
+
   return null;
 }
 
 function normalizeVisual(s) {
   let res = s.toLowerCase();
-  // Önce tekli karakter değişimleri
   res = Array.from(res).map(c => LOOKALIKE_MAP[c] || c).join('');
-  // Sonra çoklu karakter değişimleri (rn -> m vb)
   for (const [key, val] of Object.entries(NORM_MAP)) {
     res = res.split(key).join(val);
   }
