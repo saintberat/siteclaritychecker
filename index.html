@@ -15,7 +15,7 @@
 
 <div class="loading-overlay" id="loading-overlay">
   <div class="spin-ring"></div>
-  <div class="loading-text">Analiz ediliyor...</div>
+  <div class="loading-text" data-i18n="loading">Analiz ediliyor...</div>
   <div class="loading-log" id="loading-log"></div>
 </div>
 
@@ -23,10 +23,15 @@
   <header class="header">
     <div class="header-top">
       <div class="blink-dot"></div>
-      <span class="tag">URL Güvenlik Analizi</span>
+      <span class="tag" data-i18n="tag">URL Güvenlik Analizi</span>
+      <button class="lang-toggle" id="lang-toggle" title="Dil Değiştir">
+        <span class="lang-option active" data-lang="tr">TR</span>
+        <span class="lang-separator">|</span>
+        <span class="lang-option" data-lang="en">EN</span>
+      </button>
     </div>
     <h1>BuSite<span class="dim">Güvenli</span>Mi?</h1>
-    <p class="subtitle">Kaynak kodu taraması, yapısal risk analizi ve bilinen tehdit kalıplarıyla URL güvenliğini kontrol eder. Google Safe Browsing API entegrasyonu destekler.</p>
+    <p class="subtitle" data-i18n="subtitle">Kaynak kodu taraması, yapısal risk analizi ve bilinen tehdit kalıplarıyla URL güvenliğini kontrol eder. Google Safe Browsing API entegrasyonu destekler.</p>
   </header>
 
   <div class="form-section">
@@ -37,14 +42,14 @@
     <div class="controls">
       <label class="toggle-wrap">
         <input type="checkbox" id="deep-scan">
-        <span class="toggle-label">Kaynak kodu tara</span>
+        <span class="toggle-label" data-i18n="deepScan">Kaynak kodu tara</span>
       </label>
       <label class="toggle-wrap">
         <input type="checkbox" id="strict-mode">
-        <span class="toggle-label">Sıkı mod</span>
+        <span class="toggle-label" data-i18n="strictMode">Sıkı mod</span>
       </label>
       <button class="btn" id="analyze-btn">
-        <span class="btn-icon">⬡</span> Tara
+        <span class="btn-icon">⬡</span> <span data-i18n="scanBtn">Tara</span>
       </button>
     </div>
     <div class="err-msg" id="err-msg"></div>
@@ -56,7 +61,7 @@
     <div class="verdict-row">
       <div class="score-block">
         <div class="score-num" id="score-num">0</div>
-        <div class="score-sub">Risk Puanı / 100</div>
+        <div class="score-sub" data-i18n="scoreSub">Risk Puanı / 100</div>
       </div>
       <span class="verdict-badge" id="verdict-badge">—</span>
     </div>
@@ -67,14 +72,14 @@
 
     <div class="summary-text" id="summary-text"></div>
 
-    <div class="section-title">Kontrol Katmanları</div>
+    <div class="section-title" data-i18n="checkLayers">Kontrol Katmanları</div>
     <div class="checks-grid" id="checks-grid"></div>
 
-    <div class="section-title">Bulgular</div>
+    <div class="section-title" data-i18n="findings">Bulgular</div>
     <ul class="findings" id="findings-list"></ul>
 
     <div class="source-section" id="source-section" style="display:none">
-      <div class="section-title">Kaynak Kodu Analizi</div>
+      <div class="section-title" data-i18n="sourceAnalysis">Kaynak Kodu Analizi</div>
       <div class="source-panel">
         <div class="source-header">
           <span id="source-url-label" style="color:var(--muted)">—</span>
@@ -88,20 +93,21 @@
 
   <div class="footer-note">
     <div class="footer-item">
-      <div class="footer-item-title">Yapısal analiz</div>
-      <div class="footer-item-desc">HTTPS, IP, Punycode, TLD, subdomain, lookalike ve entropi kontrolü.</div>
+      <div class="footer-item-title" data-i18n="footerTitle1">Yapısal analiz</div>
+      <div class="footer-item-desc" data-i18n="footerDesc1">HTTPS, IP, Punycode, TLD, subdomain, lookalike ve entropi kontrolü.</div>
     </div>
     <div class="footer-item">
-      <div class="footer-item-title">Kaynak tarama</div>
-      <div class="footer-item-desc">Ücretsiz CORS proxy servisleri ile kaynak kodu çekilir. Form, script ve obfuscation taranır.</div>
+      <div class="footer-item-title" data-i18n="footerTitle2">Kaynak tarama</div>
+      <div class="footer-item-desc" data-i18n="footerDesc2">Ücretsiz CORS proxy servisleri ile kaynak kodu çekilir. Form, script ve obfuscation taranır.</div>
     </div>
     <div class="footer-item">
-      <div class="footer-item-title">Sınırlar</div>
-      <div class="footer-item-desc">Tamamen istemci taraflı çalışır. Bazı siteler CORS proxy ile erişilemeyebilir.</div>
+      <div class="footer-item-title" data-i18n="footerTitle3">Sınırlar</div>
+      <div class="footer-item-desc" data-i18n="footerDesc3">Tamamen istemci taraflı çalışır. Bazı siteler CORS proxy ile erişilemeyebilir.</div>
     </div>
   </div>
 </div>
 
 <script src="script.js"></script>
+<script src="i18n.js"></script>
 </body>
 </html>
