@@ -79,6 +79,46 @@ body {
   font-family: var(--mono);
 }
 
+.lang-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  flex-shrink: 0;
+}
+
+.lang-toggle:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+  background: var(--surface2);
+}
+
+.lang-separator {
+  color: var(--dim);
+  margin: 0 6px;
+  user-select: none;
+}
+
+.lang-option {
+  color: var(--muted);
+  transition: color 0.2s;
+  user-select: none;
+}
+
+.lang-option.active {
+  color: var(--accent);
+}
+
 h1 {
   font-size: clamp(2rem, 5vw, 3rem);
   font-weight: 600;
