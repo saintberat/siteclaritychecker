@@ -150,5 +150,4 @@ Bu sistem:
 - Zararlı script davranışlarını analiz eder  
 - Kullanıcıyı riskli siteler konusunda uyarır  
 
-Kısacası:  
-Linke bakıp “bu biraz garip” demek yerine, neden garip olduğunu teknik olarak açıklıyor.
+
