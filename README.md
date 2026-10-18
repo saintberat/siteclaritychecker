@@ -1,153 +1,116 @@
-## Siteye ulaşmak için: https://saintberat.github.io/siteclaritychecker/
-## 🔎 URL Güvenlik Analizi Nasıl Çalışır?
+# 🌐 Site Clarity Checker
 
-Bu araç, girilen bir URL’yi analiz ederek phishing, zararlı yazılım ve sosyal mühendislik risklerini tespit etmeye çalışır.  
-Hem URL yapısını hem de (isteğe bağlı) sayfanın kaynak kodunu inceleyerek skor bazlı bir risk değerlendirmesi yapar.
+## Live Demo: [https://saintberat.github.io/siteclaritychecker/](https://saintberat.github.io/siteclaritychecker/)
 
----
+A client-side web security scanner that inspects URLs in real time to detect phishing attempts, malicious scripts, brand impersonation, and social engineering risks.
 
-### ⚙️ Genel Mantık
-
-Kullanıcı bir URL girer:
-
-1. URL normalize edilir (`https://` eklenir vs.)  
-2. Yapısal analiz yapılır  
-3. (Opsiyonel) kaynak kodu çekilir  
-4. Tüm bulgulara göre risk skoru hesaplanır  
-5. Sonuç kullanıcıya detaylı şekilde gösterilir  
+It performs both structural URL analysis and optional deep source code inspection using CORS proxies, generating a weighted risk score (0–100) and an actionable breakdown of findings.
 
 ---
 
-### 🌐 URL Analizi
+## 🔎 How It Works
 
-#### 🔐 Protokol Kontrolü
-- `HTTPS` → Güvenli  
-- `HTTP` → Risk (veriler şifrelenmez)
+### ⚙️ General Logic
 
----
+When a user submits a URL:
 
-#### 🌍 Domain Kontrolü
-
-- IP ile erişim → yüksek risk  
-- Punycode / unicode → görsel aldatma riski  
-- Şüpheli TLD’ler (`.xyz`, `.tk`, vs.) → ek risk  
-- Güvenilir domain listesi → risk düşürülür  
+1. **Normalization:** The URL protocol is validated and standardized (ensuring `https://` by default).
+2. **Structural Analysis:** Immediate checks are run against the hostname, protocol, path, and query parameters.
+3. **Deep Scan (Optional):** The target page's HTML source code is fetched via CORS proxies.
+4. **Heuristic Scoring:** All findings are compiled and weighted into an overall risk score from 0 to 100.
+5. **Report Presentation:** A detailed verdict with categorized check layers and findings is rendered.
 
 ---
 
-#### 🧱 URL Yapısı
+## 🌐 Analysis Layers
 
-- Çok fazla subdomain → gizleme taktiği olabilir  
-- Aşırı uzun path → şüpheli yönlendirme  
-
----
-
-#### 🏷️ Marka Taklidi (Phishing)
-
-- Bilinen markalar kontrol edilir (Google, PayPal, vs.)  
-- Lookalike karakterler tespit edilir (`g00gle`, `paypa1` gibi)  
-- Levenshtein distance ile benzerlik ölçülür  
+### 🔐 Protocol Verification
+- **HTTPS:** Secure, encrypted transport channel.
+- **HTTP:** Flagged as a risk (data transmitted in cleartext).
 
 ---
 
-#### ⚠️ Şüpheli Kelimeler
-
-URL içinde şu tarz kelimeler aranır:
-
-- login, verify, secure  
-- bank, account, password  
-- bonus, wallet, confirm  
-
-Bunlar sosyal mühendislik ihtimalini artırır.
+### 🌍 Domain & DNS Inspection
+- **Direct IP Access:** Direct IP addresses instead of domain names (classic indicator of phishing infrastructure).
+- **Punycode / IDN Spoofing:** Detects `xn--` and Cyrillic/Greek homoglyphs used for visual deception.
+- **Suspicious TLDs:** Flags high-abuse extensions (e.g., `.xyz`, `.top`, `.tk`, `.zip`).
+- **Trusted Domain Allowlist:** Verified domains receive risk score reductions.
 
 ---
 
-### 🧠 Strict Mode (Gelişmiş Analiz)
-
-Açıldığında ekstra kontroller yapılır:
-
-- Domain uzunluğu  
-- Tire (-) sayısı  
-- Rakam yoğunluğu  
-- Entropi analizi  
-
-Amaç: rastgele üretilmiş (malicious) domainleri yakalamak.
+### 🧱 URL Structural Patterns
+- **Deep Subdomains:** Excessive subdomain layering (often used to obscure the legitimate domain).
+- **Abnormal Path Length:** Unusually lengthy paths indicative of redirect obfuscation or exploit payloads.
 
 ---
 
-### 🧬 Kaynak Kod Analizi (Deep Scan)
-
-Opsiyonel olarak site HTML’i çekilir ve analiz edilir.
-
-#### 🚨 Zararlı Patternler
-
-- Obfuscated `eval()` kullanımı  
-- Base64 decode işlemleri  
-- `document.write` ile gizli script  
-- CharCode obfuscation  
+### 🏷️ Brand Impersonation (Phishing & Lookalikes)
+- Monitored brand list (Google, Microsoft, PayPal, Amazon, Apple, Banking & Crypto services).
+- **Homoglyph & visual character replacement mapping** (e.g., `0` ↔ `o`, `1` ↔ `l`, `rn` ↔ `m`, `vv` ↔ `w`).
+- **Levenshtein Distance Analysis:** Identifies fuzzy typographical similarity to major brands.
 
 ---
 
-#### 🔁 Yönlendirmeler
-
-- `window.location`  
-- `meta refresh`  
-
-Çok fazla yönlendirme → şüpheli davranış
+### ⚠️ Social Engineering Keywords
+Scans for high-risk phishing vocabulary in the URL path and parameters:
+- `login`, `verify`, `secure`, `bank`, `account`, `update`
+- `signin`, `confirm`, `bonus`, `wallet`, `suspend`, `password`
 
 ---
 
-#### 📡 Harici Scriptler
+## 🧠 Strict Mode (Advanced Heuristics)
 
-- Farklı domainlerden script yüklenmesi incelenir  
-- Çok fazla dış kaynak → risk artar  
-
----
-
-#### 🧾 Form Analizi
-
-- Form başka bir domaine veri gönderiyorsa → ciddi risk  
-- Özellikle login/password içeren formlar kontrol edilir  
+When enabled, enforces rigorous statistical checks to catch randomly generated malicious domains (DGAs):
+- **Excessive Domain Length:** Domains longer than 24 characters.
+- **Hyphen Density:** 3 or more hyphens in the hostname.
+- **Digit Concentration:** 4 or more numeric digits.
+- **Shannon Entropy Analysis:** Detects algorithmic randomness ($H > 3.8\text{ bits}$).
 
 ---
 
-#### 🧨 Ek Tehditler
+## 🧬 Source Code Analysis (Deep Scan)
 
-- Crypto miner imzaları  
-- Keylogger patternleri  
-- Gizli input yakalama mekanizmaları  
+Optionally retrieves and parses the target website's HTML DOM using multiple CORS proxy fallbacks.
 
----
+### 🚨 Malicious Code Patterns
+- Obfuscated `eval()` execution (`unescape`, `atob`, `String.fromCharCode`)
+- Encoded `document.write` payloads
+- Dynamic object property obfuscation
+- Base64 payload decoding
 
-### 📊 Skorlama Sistemi
+### 🔁 Covert Redirects
+- Automated JavaScript redirects via `window.location`
+- HTML `<meta http-equiv="refresh">` tags
 
-Toplanan tüm bulgulara göre:
+### 📡 External Script Ingestion
+- Cross-origin script loading
+- Excessive disparate script sources
 
-- **0 – 24 → Düşük Risk**  
-- **25 – 54 → Orta Risk**  
-- **55+ → Yüksek Risk**  
+### 🧾 Credential Harvesting & Forms
+- Forms submitting sensitive inputs (`password`, `email`, `account`) to third-party domains.
 
----
-
-### 🧾 Sonuç
-
-Kullanıcıya:
-
-- Risk skoru  
-- Güvenlik özeti  
-- Detaylı bulgular  
-- (Varsa) kaynak kod analiz çıktısı  
-
-gösterilir.
+### 🧨 Advanced Threat Signatures
+- Browser cryptocurrency mining scripts (CoinHive, Minero, WebMR)
+- Keystroke logging patterns (`onkeypress`, `onkeydown` listeners attached to document)
 
 ---
 
-### 🛡️ Özet
+## 📊 Scoring Breakdown
 
-Bu sistem:
+| Risk Score | Verdict | Recommendation |
+| :---: | :---: | :--- |
+| **0 – 24** | 🟢 **Low Risk** | No prominent threat signals found. Proceed with normal caution. |
+| **25 – 54** | 🟡 **Medium Risk** | Suspicious elements identified. Avoid entering sensitive credentials. |
+| **55 – 100** | 🔴 **High Risk** | Multiple critical danger factors detected. Do not visit or interact. |
 
-- Phishing sitelerini tespit etmeye çalışır  
-- Zararlı script davranışlarını analiz eder  
-- Kullanıcıyı riskli siteler konusunda uyarır  
+---
 
+## 🌐 Bilingual Support
 
+Site Clarity Checker features built-in **English** and **Turkish** interfaces with one-click toggling and saved preferences.
+
+---
+
+## 📄 License
+
+MIT License. Contributions, suggestions, and issues are always welcome!

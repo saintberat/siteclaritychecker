@@ -50,6 +50,10 @@ const loadingOverlay=$('loading-overlay');
 const loadingLog   = $('loading-log');
 
 let logSteps = [];
+let lastAnalysis = null;
+let lastNormalizedUrl = null;
+
+const t = (k, ...args) => (window.i18n ? window.i18n.t(k, ...args) : k);
 
 function setLog(txt) {
   logSteps.push(txt);
@@ -66,47 +70,65 @@ analyzeBtn.addEventListener('click', async () => {
   analyzeBtn.disabled = true;
   results.classList.remove('visible');
 
-  setLog('URL ayrıştırılıyor...');
+  setLog(t('logParsing'));
   const analysis = analyzeUrl(norm.url, strictMode.checked);
-  setLog('Yapısal kontroller tamamlandı.');
+  setLog(t('logStructDone'));
 
   let sourceResult = null;
   if (deepScan.checked) {
-    setLog('Kaynak kodu getiriliyor (CORS proxy)...');
+    setLog(t('logFetchSrc'));
     sourceResult = await fetchSource(norm.url);
     if (sourceResult.ok) {
-      setLog('Kaynak analiz ediliyor...');
+      setLog(t('logAnalyzeSrc'));
       const srcAnalysis = analyzeSource(sourceResult.html, norm.url);
       analysis.score = Math.min(100, analysis.score + srcAnalysis.score);
       analysis.findings.push(...srcAnalysis.findings);
       analysis.sourceResult = sourceResult;
       analysis.srcAnalysis = srcAnalysis;
     } else {
-      setLog('Kaynak alınamadı: ' + sourceResult.reason);
-      analysis.findings.push({ tone:'neutral', text: 'Kaynak kodu alınamadı: ' + sourceResult.reason });
+      setLog(t('logSrcFail') + sourceResult.reason);
+      analysis.findings.push({ tone:'neutral', text: t('logSrcFailFinding') + sourceResult.reason });
     }
   }
 
   analysis.score = Math.min(100, Math.round(analysis.score));
-  setLog('Rapor oluşturuluyor...');
+  setLog(t('logReport'));
 
   await sleep(300);
   loadingOverlay.classList.remove('active');
   analyzeBtn.disabled = false;
+  lastAnalysis = analysis;
+  lastNormalizedUrl = norm.url;
   renderResult(analysis);
 });
 
 form_input.addEventListener('keydown', e => { if (e.key === 'Enter') analyzeBtn.click(); });
 form_input.addEventListener('input', clearErr);
 
+window.addEventListener('langchange', () => {
+  if (lastNormalizedUrl) {
+    // Re-run analysis rendering for current URL with updated language
+    const analysis = analyzeUrl(lastNormalizedUrl, strictMode.checked);
+    if (lastAnalysis && lastAnalysis.srcAnalysis) {
+      analysis.score = Math.min(100, analysis.score + lastAnalysis.srcAnalysis.score);
+      analysis.findings.push(...lastAnalysis.srcAnalysis.findings);
+      analysis.sourceResult = lastAnalysis.sourceResult;
+      analysis.srcAnalysis = lastAnalysis.srcAnalysis;
+    }
+    analysis.score = Math.min(100, Math.round(analysis.score));
+    lastAnalysis = analysis;
+    renderResult(analysis);
+  }
+});
+
 function normalizeUrl(val) {
-  if (!val) return { ok:false, msg:'Bir URL gir.' };
+  if (!val) return { ok:false, msg: t('errEmpty') };
   const withProto = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(val) ? val : `https://${val}`;
   try {
     const u = new URL(withProto);
-    if (!['http:','https:'].includes(u.protocol)) return { ok:false, msg:'Sadece http/https destekleniyor.' };
+    if (!['http:','https:'].includes(u.protocol)) return { ok:false, msg: t('errProto') };
     return { ok:true, url: u };
-  } catch { return { ok:false, msg:'Geçerli bir URL gir.' }; }
+  } catch { return { ok:false, msg: t('errInvalid') }; }
 }
 
 function analyzeUrl(url, isStrict) {
@@ -118,75 +140,75 @@ function analyzeUrl(url, isStrict) {
   const trusted = isTrusted(hostname);
 
   const checks = {
-    protocol: { label:'Protokol', state:'neutral', value:'—' },
-    domain:   { label:'Alan Adı', state:'neutral', value:'—' },
-    brand:    { label:'Marka Risk', state:'neutral', value:'—' },
-    keywords: { label:'Kelime Risk', state:'neutral', value:'—' },
-    structure:{ label:'Yapı', state:'neutral', value:'—' },
-    strict:   { label:'Entropi', state:'neutral', value: isStrict ? '—' : 'Kapalı' },
+    protocol: { label: t('lblProtocol'), state:'neutral', value:'—' },
+    domain:   { label: t('lblDomain'), state:'neutral', value:'—' },
+    brand:    { label: t('lblBrand'), state:'neutral', value:'—' },
+    keywords: { label: t('lblKeywords'), state:'neutral', value:'—' },
+    structure:{ label: t('lblStructure'), state:'neutral', value:'—' },
+    strict:   { label: t('lblEntropy'), state:'neutral', value: isStrict ? '—' : t('valOff') },
   };
 
   if (url.protocol === 'http:') {
     score += 25;
-    checks.protocol = { label:'Protokol', state:'warn', value:'HTTP' };
-    findings.push({ tone:'warn', text:'Şifrelenmemiş HTTP bağlantısı. Girilen veriler açık taşınıyor.' });
+    checks.protocol = { label: t('lblProtocol'), state:'warn', value:'HTTP' };
+    findings.push({ tone:'warn', text: t('fHttpWarn') });
   } else {
-    checks.protocol = { label:'Protokol', state:'safe', value:'HTTPS ✓' };
-    findings.push({ tone:'safe', text:'HTTPS kullanılıyor, iletişim şifreli.' });
+    checks.protocol = { label: t('lblProtocol'), state:'safe', value:'HTTPS ✓' };
+    findings.push({ tone:'safe', text: t('fHttpsOk') });
   }
 
   if (isIp(hostname)) {
     score += 40;
-    checks.domain = { label:'Alan Adı', state:'danger', value:'IP Adresi' };
-    findings.push({ tone:'danger', text:'Alan adı yerine doğrudan IP kullanılıyor — klasik phishing göstergesi.' });
+    checks.domain = { label: t('lblDomain'), state:'danger', value: t('valIPAddr') };
+    findings.push({ tone:'danger', text: t('fIPDanger') });
   } else if (hostname.includes('xn--') || /[^\x00-\x7F]/.test(hostname)) {
     score += 38;
-    checks.domain = { label:'Alan Adı', state:'danger', value:'Punycode' };
-    findings.push({ tone:'danger', text:'Punycode / unicode karakter tespiti. Görsel aldatmaca riski yüksek.' });
+    checks.domain = { label: t('lblDomain'), state:'danger', value:'Punycode' };
+    findings.push({ tone:'danger', text: t('fPunycode') });
   } else {
     const tldHit = SUSPICIOUS_TLDS.find(t => hostname.endsWith(t));
     if (tldHit && !trusted) {
       score += 18;
-      checks.domain = { label:'Alan Adı', state:'warn', value:tldHit };
-      findings.push({ tone:'warn', text:`Şüpheli TLD: ${tldHit} — kötüye kullanım oranı yüksek uzantılardan.` });
+      checks.domain = { label: t('lblDomain'), state:'warn', value: tldHit };
+      findings.push({ tone:'warn', text: t('fSuspTLD', tldHit) });
     } else if (trusted) {
-      checks.domain = { label:'Alan Adı', state:'safe', value:'Güvenilir' };
-      findings.push({ tone:'safe', text:'Bilinen güvenilir alan adı listesinde yer alıyor.' });
+      checks.domain = { label: t('lblDomain'), state:'safe', value: t('valTrusted') };
+      findings.push({ tone:'safe', text: t('fTrusted') });
     } else {
-      checks.domain = { label:'Alan Adı', state:'neutral', value:'Normal' };
+      checks.domain = { label: t('lblDomain'), state:'neutral', value: t('valNormal') };
     }
   }
 
   const subCount = Math.max(hostname.split('.').length - 2, 0);
   if (subCount >= 2 && !trusted) {
     score += 14;
-    checks.structure = { label:'Yapı', state:'warn', value:`${subCount} alt alan` };
-    findings.push({ tone:'warn', text:`Çok katmanlı subdomain (${subCount} adet). Gerçek alan adını gizleme taktiği.` });
+    checks.structure = { label: t('lblStructure'), state:'warn', value:`${subCount} ${t('valSubdomains')}` };
+    findings.push({ tone:'warn', text: t('fSubdomains', subCount) });
   } else if (url.pathname.length > 120) {
     score += 8;
-    checks.structure = { label:'Yapı', state:'warn', value:'Uzun path' };
-    findings.push({ tone:'warn', text:'URL yolu olağandışı uzun — yönlendirme karmaşıklığı şüpheli.' });
+    checks.structure = { label: t('lblStructure'), state:'warn', value: t('valLongPath') };
+    findings.push({ tone:'warn', text: t('fLongPath') });
   } else {
-    checks.structure = { label:'Yapı', state:'safe', value:'Normal' };
+    checks.structure = { label: t('lblStructure'), state:'safe', value: t('valNormal') };
   }
 
   const fakeBrand = detectBrand(hostname);
   if (fakeBrand) {
     score += 32;
-    checks.brand = { label:'Marka Risk', state:'danger', value: fakeBrand };
-    findings.push({ tone:'danger', text:`"${fakeBrand}" markasına benzemeye çalışan alan adı tespit edildi.` });
+    checks.brand = { label: t('lblBrand'), state:'danger', value: fakeBrand };
+    findings.push({ tone:'danger', text: t('fBrandFake', fakeBrand) });
   } else {
-    checks.brand = { label:'Marka Risk', state:'safe', value:'Temiz' };
-    findings.push({ tone:'safe', text:'Bilinen markaları taklit eden bir pattern bulunamadı.' });
+    checks.brand = { label: t('lblBrand'), state:'safe', value: t('valClean') };
+    findings.push({ tone:'safe', text: t('fBrandOk') });
   }
 
   const kwHits = SUSPICIOUS_WORDS.filter(w => fullUrl.includes(w));
   if (kwHits.length && !trusted) {
     score += Math.min(kwHits.length * 6, 18);
-    checks.keywords = { label:'Kelime Risk', state:'warn', value:`${kwHits.length} adet` };
-    findings.push({ tone:'warn', text:`Sosyal mühendislik kelimeleri: ${kwHits.slice(0,5).join(', ')}` });
+    checks.keywords = { label: t('lblKeywords'), state:'warn', value:`${kwHits.length} ${t('valCount')}` };
+    findings.push({ tone:'warn', text: t('fKeywordHits', kwHits.slice(0,5).join(', ')) });
   } else {
-    checks.keywords = { label:'Kelime Risk', state:'safe', value:'Temiz' };
+    checks.keywords = { label: t('lblKeywords'), state:'safe', value: t('valClean') };
   }
 
   if (isStrict) {
@@ -196,19 +218,19 @@ function analyzeUrl(url, isStrict) {
     const digits  = (hostname.match(/\d/g)||[]).length;
     const strictHits = [];
 
-    if (bare.length > 24 && !trusted) { score += 10; strictHits.push('Uzun domain'); }
-    if (hyphens >= 3 && !trusted) { score += 10; strictHits.push('Fazla tire'); }
-    if (digits >= 4 && !trusted) { score += 8; strictHits.push('Fazla rakam'); }
+    if (bare.length > 24 && !trusted) { score += 10; strictHits.push(t('fStrictLong')); }
+    if (hyphens >= 3 && !trusted) { score += 10; strictHits.push(t('fStrictHyphens')); }
+    if (digits >= 4 && !trusted) { score += 8; strictHits.push(t('fStrictDigits')); }
     if (entropy > 3.8 && bare.length > 14 && !trusted) {
       score += 14;
-      strictHits.push(`Yüksek entropi (${entropy.toFixed(2)})`);
+      strictHits.push(t('fStrictEntropy', entropy.toFixed(2)));
     }
 
     if (strictHits.length) {
-      checks.strict = { label:'Entropi', state:'warn', value: strictHits.join(', ') };
-      findings.push({ tone:'warn', text:`Sıkı mod uyarıları: ${strictHits.join(', ')}` });
+      checks.strict = { label: t('lblEntropy'), state:'warn', value: strictHits.join(', ') };
+      findings.push({ tone:'warn', text: t('fStrictWarn', strictHits.join(', ')) });
     } else {
-      checks.strict = { label:'Entropi', state:'safe', value:'Normal' };
+      checks.strict = { label: t('lblEntropy'), state:'safe', value: t('valNormal') };
     }
   }
 
@@ -275,7 +297,7 @@ function calcEntropy(s) {
 async function fetchSource(url) {
   for (const proxy of CORS_PROXIES) {
     try {
-      setLog(`Deneniyor: ${proxy.name}...`);
+      setLog(`${t('logTrying')}${proxy.name}...`);
       const apiUrl = proxy.build(url.href);
       const resp = await fetch(apiUrl, { signal: AbortSignal.timeout(15000) });
 
@@ -293,13 +315,13 @@ async function fetchSource(url) {
         return { ok: true, html: html, proxy: proxy.name };
       }
     } catch (e) {
-      console.warn(`Proxy "${proxy.name}" başarısız:`, e.message);
+      console.warn(`Proxy "${proxy.name}" failed:`, e.message);
       continue;
     }
   }
 
   try {
-    setLog('Doğrudan bağlantı deneniyor...');
+    setLog(t('logDirect'));
     const resp = await fetch(url.href, {
       mode: 'cors',
       signal: AbortSignal.timeout(10000),
@@ -314,7 +336,7 @@ async function fetchSource(url) {
 
   return {
     ok: false,
-    reason: 'Tüm CORS proxy servisleri ve doğrudan bağlantı başarısız oldu. Site erişimi engelleniyor olabilir.'
+    reason: t('logAllFailed')
   };
 }
 
@@ -327,10 +349,10 @@ function analyzeSource(html, url) {
     { re: /eval\s*\(\s*(?:unescape|atob|String\.fromCharCode)/gi, label:'Obfuscated eval()', score:30 },
     { re: /document\.write\s*\(\s*(?:unescape|atob)/gi, label:'Encoded document.write', score:25 },
     { re: /(?:window|document)\s*\[\s*['"][^'"]{1,4}['"]\s*\]/gi, label:'Property obfuscation', score:20 },
-    { re: /(?:fromCharCode|charCodeAt)\s*\(/gi, label:'CharCode kullanımı', score:15 },
+    { re: /(?:fromCharCode|charCodeAt)\s*\(/gi, label:'CharCode usage', score:15 },
     { re: /base64_decode|base64decode/gi, label:'Base64 decode', score:12 },
     { re: /\bpassword\b.*\binput\b|\binput\b.*\bpassword\b/gi, label:'Password input', score:10 },
-    { re: /\.onload\s*=\s*function.*setTimeout/gs, label:'Geciktirilmiş yükleme', score:8 },
+    { re: /\.onload\s*=\s*function.*setTimeout/gs, label:'Delayed loader', score:8 },
   ];
 
   const REDIRECT_PATTERNS = [
@@ -343,7 +365,7 @@ function analyzeSource(html, url) {
     const matches = html.match(p.re);
     if (matches) {
       score += p.score;
-      findings.push({ tone:'danger', text:`⟨src⟩ ${p.label} tespit edildi (${matches.length} yerde).` });
+      findings.push({ tone:'danger', text: t('srcDetected', p.label, matches.length) });
     }
   }
 
@@ -354,7 +376,7 @@ function analyzeSource(html, url) {
   }
   if (redirectCount > 0) {
     score += Math.min(redirectCount * 8, 24);
-    findings.push({ tone:'warn', text:`⟨src⟩ ${redirectCount} adet yönlendirme komutu bulundu.` });
+    findings.push({ tone:'warn', text: t('srcRedirects', redirectCount) });
   }
 
   const extScripts = [];
@@ -369,9 +391,9 @@ function analyzeSource(html, url) {
   const uniqueExt = [...new Set(extScripts)];
   if (uniqueExt.length > 5) {
     score += 15;
-    findings.push({ tone:'warn', text:`⟨src⟩ ${uniqueExt.length} farklı harici script kaynağı (fazla sayıda).` });
+    findings.push({ tone:'warn', text: t('srcExtScripts', uniqueExt.length) });
   } else if (uniqueExt.length > 0) {
-    findings.push({ tone:'neutral', text:`⟨src⟩ Harici script kaynakları: ${uniqueExt.slice(0,3).join(', ')}` });
+    findings.push({ tone:'neutral', text: t('srcExtInfo', uniqueExt.slice(0,3).join(', ')) });
   }
 
   const forms = html.match(/<form[^>]*>/gi) || [];
@@ -382,23 +404,23 @@ function analyzeSource(html, url) {
   });
   if (suspForms.length > 0) {
     score += suspForms.length * 20;
-    findings.push({ tone:'danger', text:`⟨src⟩ ${suspForms.length} form başka bir alana veri gönderiyor — credential harvesting riski.` });
+    findings.push({ tone:'danger', text: t('srcFormDanger', suspForms.length) });
   }
 
   const iframeCount = (html.match(/<iframe/gi)||[]).length;
   if (iframeCount > 2) {
     score += 10;
-    findings.push({ tone:'warn', text:`⟨src⟩ ${iframeCount} adet iframe bulundu.` });
+    findings.push({ tone:'warn', text: t('srcIframes', iframeCount) });
   }
 
   if (lower.includes('cryptominer') || lower.includes('coinhive') || lower.includes('minero.js') || lower.includes('webmr.js')) {
     score += 40;
-    findings.push({ tone:'danger', text:'⟨src⟩ Kripto madencisi imzası tespit edildi.' });
+    findings.push({ tone:'danger', text: t('srcCrypto') });
   }
 
   if (lower.includes('keylogger') || lower.includes('document.onkeypress') || lower.includes('document.onkeydown')) {
     score += 35;
-    findings.push({ tone:'danger', text:'⟨src⟩ Keylogger pattern tespit edildi.' });
+    findings.push({ tone:'danger', text: t('srcKeylogger') });
   }
 
   const lowerHtml = lower;
@@ -407,11 +429,11 @@ function analyzeSource(html, url) {
     suspForms.length === 0 && forms.length > 0
   ) {
     score += 8;
-    findings.push({ tone:'warn', text:'⟨src⟩ Hassas anahtar kelimeler içeren form(lar) mevcut.' });
+    findings.push({ tone:'warn', text: t('srcSensitive') });
   }
 
   if (findings.length === 0) {
-    findings.push({ tone:'safe', text:'⟨src⟩ Kaynak kodda bilinen zararlı pattern bulunamadı.' });
+    findings.push({ tone:'safe', text: t('srcClean') });
   }
 
   const snippet = extractSnippet(html);
@@ -429,16 +451,16 @@ function extractSnippet(html) {
 }
 
 function getVerdict(score) {
-  if (score >= 55) return { text:'Yüksek Risk', cls:'high', color:'#ef4444' };
-  if (score >= 25) return { text:'Orta Risk', cls:'mid', color:'#eab308' };
-  return { text:'Düşük Risk', cls:'low', color:'#22c55e' };
+  if (score >= 55) return { text: t('verdictHigh'), cls:'high', color:'#ef4444' };
+  if (score >= 25) return { text: t('verdictMid'), cls:'mid', color:'#eab308' };
+  return { text: t('verdictLow'), cls:'low', color:'#22c55e' };
 }
 
 function buildSummary(score, trusted) {
-  if (trusted && score < 25) return 'Bilinen ve güvenilir bir alan adı. Yine de dikkatli ol.';
-  if (score >= 55) return 'Birden fazla güçlü risk faktörü tespit edildi. Bu siteyi ziyaret etmekten veya bilgi girmekten kaçın.';
-  if (score >= 25) return 'Bazı şüpheli unsurlar mevcut. Siteyi dikkatle incele, kişisel bilgi girme.';
-  return 'Belirgin bir tehdit işareti bulunamadı. Yine de beklenmedik bir linkse temkinli ol.';
+  if (trusted && score < 25) return t('summaryTrusted');
+  if (score >= 55) return t('summaryHigh');
+  if (score >= 25) return t('summaryMid');
+  return t('summaryLow');
 }
 
 function renderResult(a) {
@@ -478,7 +500,7 @@ function renderResult(a) {
     sourceUrlLabel.textContent  = 'proxy-' + a.sourceResult.proxy;
     sourceStatus.textContent    = '200 OK';
     sourceStatus.className      = 'source-status ok';
-    sourceBody.textContent      = a.srcAnalysis.snippet || '(boş)';
+    sourceBody.textContent      = a.srcAnalysis.snippet || '(empty)';
 
     sourceFindings.innerHTML = '';
     const highSrc = a.srcAnalysis.findings.filter(f => f.tone === 'danger' || f.tone === 'warn');
@@ -492,10 +514,10 @@ function renderResult(a) {
     }
   } else if (deepScan.checked) {
     sourceSection.style.display = 'block';
-    sourceUrlLabel.textContent  = 'kaynak tarama';
-    sourceStatus.textContent    = 'Erişilemedi';
+    sourceUrlLabel.textContent  = t('srcLabel');
+    sourceStatus.textContent    = t('srcAccessFail');
     sourceStatus.className      = 'source-status err';
-    sourceBody.textContent      = 'CORS proxy servisleri aracılığıyla kaynak kodu alınamadı. Site erişimi engelliyor olabilir.';
+    sourceBody.textContent      = t('srcAccessDesc');
     sourceFindings.innerHTML    = '';
   } else {
     sourceSection.style.display = 'none';

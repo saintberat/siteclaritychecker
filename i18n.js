@@ -195,8 +195,12 @@
 
   
   window.i18n = {
-    t(key) {
-      return translations[currentLang][key] || translations['tr'][key] || key;
+    t(key, ...args) {
+      const val = translations[currentLang]?.[key] ?? translations['tr']?.[key] ?? key;
+      if (typeof val === 'function') {
+        return val(...args);
+      }
+      return val;
     },
     lang() {
       return currentLang;
@@ -212,33 +216,32 @@
       }
     });
 
-    
     if (currentLang === 'en') {
       document.title = 'IsThisSiteSafe?';
-      document.querySelector('meta[name="description"]').setAttribute('content', 'URL security analysis tool — source code, DNS, and structural risk scanning.');
-      document.getElementById('lang-toggle').title = 'Switch Language';
+      document.querySelector('meta[name="description"]')?.setAttribute('content', 'URL security analysis tool — source code, DNS, and structural risk scanning.');
+      const btn = document.getElementById('lang-toggle');
+      if (btn) btn.title = 'Switch Language';
     } else {
       document.title = 'BuSiteGüvenliMi?';
-      document.querySelector('meta[name="description"]').setAttribute('content', 'URL güvenlik analiz aracı — kaynak kodu, DNS ve yapısal risk taraması.');
-      document.getElementById('lang-toggle').title = 'Dil Değiştir';
+      document.querySelector('meta[name="description"]')?.setAttribute('content', 'URL güvenlik analiz aracı — kaynak kodu, DNS ve yapısal risk taraması.');
+      const btn = document.getElementById('lang-toggle');
+      if (btn) btn.title = 'Dil Değiştir';
     }
 
-    
     document.documentElement.lang = currentLang === 'en' ? 'en' : 'tr';
   }
 
   function toggleLang() {
     currentLang = currentLang === 'tr' ? 'en' : 'tr';
 
-    
     document.querySelectorAll('.lang-option').forEach((opt) => {
       opt.classList.toggle('active', opt.getAttribute('data-lang') === currentLang);
     });
 
     applyStaticTranslations();
 
-    
     try { localStorage.setItem('sitechecker-lang', currentLang); } catch {}
+    window.dispatchEvent(new CustomEvent('langchange', { detail: { lang: currentLang } }));
   }
 
   
