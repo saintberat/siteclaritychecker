@@ -115,4 +115,4 @@ Site Clarity Checker features built-in **English** and **Turkish** interfaces wi
 
 MIT License. Contributions, suggestions, and issues are always welcome!
 
-<!-- sync-activity: 2026-10-30T17:02:32Z (2d10e47c) -->
+<!-- sync-activity: 2026-10-31T17:00:40Z (d66c3594) -->
